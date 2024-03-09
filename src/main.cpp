@@ -9,7 +9,7 @@ void initFOC(HFIBLDCMotor *motor, BLDCDriver *driver, CurrentSense *currentsense
 HFIBLDCMotor motor_1 = HFIBLDCMotor(7,20);
 HFIBLDCMotor motor_2 = HFIBLDCMotor(7,20);
 
-#ifdef STM32F4xx
+#if defined(STM32F4xx) || defined(STM32F7xx)
 BLDCDriver3PWM driver_1 = BLDCDriver3PWM(MOT1_A, MOT1_B, MOT1_C, MOT1_EN);
 LowsideCurrentSense currentsense_1 = LowsideCurrentSense(0.01f, 50.0f, CS1_A, CS1_B);
 
@@ -139,7 +139,7 @@ void initFOC(HFIBLDCMotor *motor, BLDCDriver *driver, CurrentSense *currentsense
   // motor.Ld = 4000e-6f;
   // motor.Lq = 6500e-6f;
 
-  motor->hfi_v = 12;
+  motor->hfi_v = 15;
 
   motor->init();
   motor->initFOC();

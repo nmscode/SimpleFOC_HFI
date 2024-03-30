@@ -8,7 +8,7 @@
 
 #define MOT2_A  PB3 // 3
 #define MOT2_B  PB6 // 10
-#define MOT2_C  PA7 // 11
+#define MOT2_C  PA5 // 11
 #define MOT2_EN PA8 // 7
 
 // encoder pinouts

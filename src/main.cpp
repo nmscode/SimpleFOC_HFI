@@ -86,14 +86,14 @@ void setup() {
   motor.P_angle.I = 0.1f;
   motor.P_angle.D = 0.005f;
   motor.P_angle.output_ramp = 0;
-  motor.LPF_angle.Tf = 0.;
+  motor.LPF_angle.Tf =  1/(25*_2PI);
 
   motor.PID_velocity.P = 0.01f;
   motor.PID_velocity.I = 0.01f;
   motor.PID_velocity.D = 0.0f;
   motor.PID_velocity.output_ramp = 0;
-  motor.LPF_velocity.Tf = 0.; // this is not currently used because HFI doesn't use the sensor class at all, and this is implemented in FOCMotor. TBD on how to handle.
-
+  motor.LPF_velocity.Tf = 1/(25*_2PI); 
+  
 
   motor.LPF_current_d.Tf = 1/(2000*_2PI);
   motor.LPF_current_q.Tf = 1/(2000*_2PI);

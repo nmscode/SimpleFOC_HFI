@@ -2,11 +2,11 @@
 #include "pinout.h"
 #include "SimpleFOC.h"
 
-HFIBLDCMotor motor = HFIBLDCMotor(3,0.7,35.0f,4e-3f);
+HFIBLDCMotor motor = HFIBLDCMotor(3,0.35,42.0f,2.2e-3f);
 
 #if defined(STM32F4xx) || defined(STM32F7xx)
-BLDCDriver3PWM driver = BLDCDriver3PWM(MOT1_A, MOT1_B, MOT1_C, MOT1_EN);
-LowsideCurrentSense currentsense = LowsideCurrentSense(0.01f, 50.0f, CS_A, CS_B);
+BLDCDriver6PWM driver = BLDCDriver6PWM(U_H,U_L,W_H,W_L,V_H,V_L);
+LowsideCurrentSense currentsense = LowsideCurrentSense(0.01f, 20.0f, CS_A, CS_B);
 #endif
 
 #ifdef ARDUINO_B_G431B_ESC1
@@ -17,8 +17,10 @@ LowsideCurrentSense currentsense = LowsideCurrentSense(0.003f, -64.0f/7.0f, A_OP
 #ifdef ESP32
 #include <soc/adc_periph.h>
 #include <driver/adc.h>
-BLDCDriver3PWM driver = BLDCDriver3PWM(26, 27, 33, 12); // c-> b1
-LowsideCurrentSense currentsense = LowsideCurrentSense(0.01f, 50.0f, 35, 34);
+// BLDCDriver3PWM driver = BLDCDriver3PWM(33, 32, 25); // c-> b1
+// LowsideCurrentSense currentsense = LowsideCurrentSense(0.01f, 50.0f, 39, 36);
+BLDCDriver6PWM driver = BLDCDriver6PWM(33, 32, 14, 27, 26, 25);
+LowsideCurrentSense currentsense = LowsideCurrentSense(0.010f, 20.00f,39,36);
 #endif
 
 Commander command = Commander(Serial);
@@ -30,7 +32,8 @@ void process_hfi(){motor.process_hfi();}
 
 float target_vel_ramp = 0;
 float target_velocity = 0;
-float rampRate=5;
+float rampRate=20.0;
+int cnt=0;
 void doTarget(char* cmd) {
   command.scalar(&target_velocity, cmd);
 }
@@ -38,20 +41,22 @@ void setup() {
   #ifdef ESP32
   setCpuFrequencyMhz(240);
   Serial.begin(115200);
-  pinMode(2,OUTPUT);
+  //pinMode(2,OUTPUT);
   #else
   pinMode(PC10,OUTPUT);
   Serial.begin(115200);
 	#endif
   SimpleFOCDebug::enable(&Serial);
   
-  while (!Serial.available()) {}
+  
 
-  driver.voltage_power_supply = 22;
-  driver.pwm_frequency = 20000;
+  driver.voltage_power_supply = 200.0f;
+  driver.pwm_frequency = 10000;
   driver.voltage_limit = driver.voltage_power_supply;
+  driver.dead_zone=0.04;
   driver.init();
 
+  while (!Serial.available()) {}
 
   command.add('M',&onMotor,"motor");
   command.add('T', doTarget, "target velocity");
@@ -62,8 +67,9 @@ void setup() {
   // don't skip current sense align with sfoc shield
   // currentsense.skip_align = true;
   currentsense.init();
-  motor.voltage_sensor_align=0.5;
-  motor.current_limit = 3.0f;
+  motor.voltage_sensor_align = 1.0+8.0;//Add 8V to compensate deadtime
+  motor.deadtime_compensation=4.0; //Compensate 4V on each side
+  motor.current_limit = 5.5;
   motor.P_angle.P = 3.0f;
   motor.P_angle.I = 1.0f;
   motor.P_angle.D = 0.1f;
@@ -73,7 +79,7 @@ void setup() {
   motor.PID_velocity.P = 0.1f;
   motor.PID_velocity.I = 0.5f;
   motor.PID_velocity.D = 0.0005f;
-  motor.PID_velocity.output_ramp = 2000;
+  motor.PID_velocity.output_ramp = 1000;
   motor.LPF_velocity.Tf = 1/(25*_2PI); 
   
 
@@ -81,6 +87,7 @@ void setup() {
   motor.LPF_current_q.Tf = 1/(2000*_2PI);
   motor.torque_controller = TorqueControlType::foc_current;
   motor.controller = MotionControlType::torque;
+  //motor.controller = MotionControlType::velocity_openloop;
 
   // 2804 140kv
   // motor.Ld = 2200e-6f;
@@ -91,26 +98,30 @@ void setup() {
   // motor.Lq = 6500e-6f;
 
   //3548 790kv
-  motor.phase_resistance=0.7;
-  motor.Ld = 1.212e-3f;
-  motor.Lq = 2.998e-3f;
-  motor.error_saturation_limit=0.1;
-  motor.hfi_v = 15.0;
-  motor.polarity_alignment_voltage=1.0;
-  motor.bemf_threshold=3.5;
+  motor.phase_resistance=0.35;
+  motor.Ld = 1.400e-3f;
+  motor.Lq = 3.000e-3f;
+  motor.error_saturation_limit=0.3;
+  motor.hfi_v = 35.0;
+  motor.polarity_alignment_voltage=3.0;
+  motor.bemf_threshold=20.0;
+  motor.fo_hysteresis_threshold=500;
+  motor.voltage_limit=90;
 
   motor.init();
   motor.initFOC();
 
-
+  Serial.println(motor.enabled);
   motor.hfi_on = true;
   motor.sensor_direction = Direction::CCW;
   motor.current_setpoint.d = 0.00f;
-  motor.ocp_protection_limit=5.5;
-
+  motor.ocp_protection_limit=7.0;
+  motor.ocp_protection_maxcycles=4;
+  Serial.println(motor.enabled);
   delay(1000);
   motor.start_polarity_alignment=true;
   delay(1000);
+  Serial.println(motor.enabled);
 }
 
 uint32_t time_prev=0;
@@ -120,15 +131,28 @@ void loop() {
   motor.move(target_vel_ramp);
    // time_prev = time_now;
   //}
+  if(!abs(target_velocity-target_vel_ramp)<0.001){
+
   if(target_velocity>target_vel_ramp){
     target_vel_ramp+=(rampRate/1000000)*(micros() - time_prev);
   }
   if(target_velocity<target_vel_ramp){
     target_vel_ramp-=(rampRate/1000000)*(micros() - time_prev);
   }
+  }
   time_prev=micros();
-
-  motor.loopFOC();
+  if(cnt>=1000){
+  if(motor.enabled){
+  //Serial.println(motor.delta_current.q,motor.electrical_angle);
+  Serial.printf("%f,%f,%f,%f\n",motor.current_meas.q,motor.current_meas.d,motor.sensorless_velocity,motor.flux_observer_velocity);
+  }
+  else{
+    Serial.println("OCP TRIPPED");
+  }
+  cnt=0;
+  }
+  cnt+=1;
+  //motor.loopFOC();
   command.run();
 
 }

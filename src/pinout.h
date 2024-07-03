@@ -1,12 +1,12 @@
 #pragma once
 
 #ifdef STM32F4xx
-#define MOT1_A  PB4 // 5 or 3 - PB4 or PB3
-#define MOT1_B  PC7 // 9 or 10 - PC7 or PB6
-#define MOT1_C  PB10 // 6, 11, or 13 - PB10, PA7, or PA5
-#define MOT1_EN PA9 // 8
-// #define MOT2_A  PB3 // 3
-// #define MOT2_B  PC7 // 9
+#define U_H  PB4 // 5 or 3 - PB4 or PB3
+#define W_H  PB10 // 9 or 10 - PC7 or PB6
+#define V_H  PA9 // 6, 11, or 13 - PB10, PA7, or PA5
+#define U_L PB5 // 8
+#define W_L  PB3 // 3
+#define V_L  PA8 // 
 // #define MOT2_C  PA7 // 11
 // #define MOT2_EN PB10 // 7
 // encoder pinouts
